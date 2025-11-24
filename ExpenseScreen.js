@@ -18,6 +18,18 @@ export default function ExpenseScreen() {
   const [category, setCategory] = useState('');
   const [note, setNote] = useState('');
   const [dateFilter, setDateFilter] = useState('all');
+
+  const getTotalSpending = () => {
+    return getFilteredExpenses().reduce((sum, expense) => sum + expense.amount, 0);
+  };
+
+  const getTotalByCategory = () => {
+    const filtered = getFilteredExpenses();
+    return filtered.reduce((acc, expense) => {
+      acc[expense.category] = (acc[expense.category] || 0) + expense.amount;
+      return acc;
+    }, {});
+  };
   
   const loadExpenses = async () => {
     const rows = await db.getAllAsync(
@@ -186,6 +198,23 @@ export default function ExpenseScreen() {
         </TouchableOpacity>
       </View>
 
+      <View style={styles.summaryContainer}>
+        <View style={styles.summaryBox}>
+          <Text style={styles.summaryLabel}>Total Spending</Text>
+          <Text style={styles.summaryAmount}>${getTotalSpending().toFixed(2)}</Text>
+        </View>
+      </View>
+
+      <View style={styles.categoryContainer}>
+        <Text style={styles.categoryTitle}>By Category</Text>
+        {Object.entries(getTotalByCategory()).map(([cat, total]) => (
+          <View key={cat} style={styles.categoryRow}>
+            <Text style={styles.categoryName}>{cat}</Text>
+            <Text style={styles.categoryAmount}>${total.toFixed(2)}</Text>
+          </View>
+        ))}
+      </View>
+
       <FlatList
         data={getFilteredExpenses()}
         keyExtractor={(item) => item.id.toString()}
@@ -195,9 +224,6 @@ export default function ExpenseScreen() {
         }
       />
 
-      <Text style={styles.footer}>
-        Enter your expenses and they'll be saved locally with SQLite.
-      </Text>
     </SafeAreaView>
   );
 }
@@ -213,13 +239,14 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '800',
     color: '#826bdfff',
-    marginBottom: 20,
-    marginTop: 40,
+    marginBottom: 10,
+    marginTop: 30,
     marginHorizontal: 20,
     letterSpacing: -0.5,
   },
   form: {
-    marginBottom: 40,
+    marginTop: 1,
+    marginBottom: 10,
     marginHorizontal: 20,
     gap: 10,
     backgroundColor: '#fff',
@@ -238,7 +265,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#e5e7eb',
-    fontSize: 16,
+    fontSize: 12,
   },
   filterContainer: {
     flexDirection: 'row',
@@ -249,8 +276,8 @@ const styles = StyleSheet.create({
   filterButton: {
     flex: 1,
     paddingVertical: 10,
-    paddingHorizontal: 5,
-    marginHorizontal: 10,
+    paddingHorizontal: 2,
+    marginHorizontal: 20,
     backgroundColor: '#fab4e3ff',
     borderRadius: 8,
     borderWidth: 1.5,
@@ -263,8 +290,8 @@ const styles = StyleSheet.create({
   filterText: {
     textAlign: 'center',
     color: '#ffffffff',
-    fontWeight: '600',
-    fontSize: 14,
+    fontWeight: '800',
+    fontSize: 10,
   },
   expenseRow: {
     flexDirection: 'row',
@@ -334,6 +361,62 @@ const styles = StyleSheet.create({
    addButtonText: {
     color: '#ffffff',            
     fontWeight: '700',
-    fontSize: 16,
+    fontSize: 12,
+  },
+    summaryContainer: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+  },
+  summaryBox: {
+    backgroundColor: '#fab4e3ff',
+    padding: 5,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  summaryLabel: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  summaryAmount: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
+    marginTop: 4,
+  },
+  categoryContainer: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+    backgroundColor: '#fff',
+    padding: 12,
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  categoryTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: 8,
+  },
+  categoryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  categoryName: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  categoryAmount: {
+    fontSize: 12,
+    color: '#826bdfff',
+    fontWeight: '700',
   },
 });
