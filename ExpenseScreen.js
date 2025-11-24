@@ -7,6 +7,7 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
+  Modal,
 } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 
@@ -18,6 +19,11 @@ export default function ExpenseScreen() {
   const [category, setCategory] = useState('');
   const [note, setNote] = useState('');
   const [dateFilter, setDateFilter] = useState('all');
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editingExpense, setEditingExpense] = useState(null);
+  const [editAmount, setEditAmount] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [editNote, setEditNote] = useState('');
 
   const getTotalSpending = () => {
     return getFilteredExpenses().reduce((sum, expense) => sum + expense.amount, 0);
@@ -80,14 +86,10 @@ export default function ExpenseScreen() {
 
       const today = new Date().toISOString().split('T')[0];
 
-      console.log('Adding expense:', { amountNumber, trimmedCategory, trimmedNote, today });
-
       await db.runAsync(
         'INSERT INTO expenses (amount, category, note, date) VALUES (?, ?, ?, ?);',
         [amountNumber, trimmedCategory, trimmedNote || null, today]
       );
-
-      console.log('Expense added successfully');
 
       setAmount('');
       setCategory('');
@@ -105,6 +107,43 @@ export default function ExpenseScreen() {
     loadExpenses();
   };
 
+  const saveEditedExpense = async () => {
+    try {
+      const amountNumber = parseFloat(editAmount);
+      if (isNaN(amountNumber) || amountNumber <= 0) {
+        alert('Please enter a valid amount');
+        return;
+      }
+
+      const trimmedCategory = editCategory.trim();
+      const trimmedNote = editNote.trim();
+      if (!trimmedCategory) {
+        alert('Please enter a category');
+        return;
+     }
+      if (!editingExpense) {
+        alert('No expense selected');
+        return;
+      }
+
+      await db.runAsync(
+        'UPDATE expenses SET amount = ?, category = ?, note = ? WHERE id = ?;',
+        [amountNumber, trimmedCategory, trimmedNote || null, editingExpense.id]
+      );
+
+      setEditModalVisible(false);
+      setEditingExpense(null);
+      setEditAmount('');
+      setEditCategory('');
+      setEditNote('');
+
+      await loadExpenses();
+    } catch (error) {
+      console.error('Error updating expense:', error);
+      alert('Failed to save changes: ' + (error.message || error));
+    }
+  };
+
   const renderExpense = ({ item }) => (
     <View style={styles.expenseRow}>
       <View style={{ flex: 1 }}>
@@ -113,6 +152,18 @@ export default function ExpenseScreen() {
         <Text style={styles.expenseDate}>{item.date}</Text>
         {item.note ? <Text style={styles.expenseNote}>{item.note}</Text> : null}
       </View>
+
+  <TouchableOpacity
+    style={styles.editButton}
+    onPress={() => {
+     setEditingExpense(item);
+     setEditAmount(String(item.amount));
+     setEditCategory(item.category);
+     setEditNote(item.note || '');
+     setEditModalVisible(true);
+   }}> 
+   <Text style={styles.editButtonText}>Edit</Text>
+  </TouchableOpacity>
 
       <TouchableOpacity onPress={() => deleteExpense(item.id)}>
         <Text style={styles.delete}>✕</Text>
@@ -123,8 +174,7 @@ export default function ExpenseScreen() {
     useEffect(() => {
     async function setup() {
       try {
-        await db.execAsync('DROP TABLE IF EXISTS expenses;');
-        
+ 
         await db.execAsync(`
           CREATE TABLE IF NOT EXISTS expenses (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -146,6 +196,49 @@ export default function ExpenseScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <Modal
+        visible={editModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.heading}>Edit Expense</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Amount"
+              keyboardType="numeric"
+              value={editAmount}
+              onChangeText={setEditAmount}
+              placeholderTextColor="#9ca3af"
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Category"
+              value={editCategory}
+              onChangeText={setEditCategory}
+              placeholderTextColor="#9ca3af"
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Note (optional)"
+              value={editNote}
+              onChangeText={setEditNote}
+              placeholderTextColor="#9ca3af"
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.cancelButton} onPress={() => setEditModalVisible(false)}>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.saveButton} onPress={saveEditedExpense}>
+                <Text style={styles.saveButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <Text style={styles.heading}>STUDENT EXPENSE TRACKER</Text>
 
       <View style={styles.form}>
@@ -416,6 +509,73 @@ const styles = StyleSheet.create({
   },
   categoryAmount: {
     fontSize: 12,
+    color: '#826bdfff',
+    fontWeight: '700',
+  },
+modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '90%',
+    backgroundColor: '#fff',
+    padding: 18,
+    borderRadius: 12,
+    elevation: 5,
+  },
+  modalInput: {
+    padding: 10,
+    backgroundColor: '#f3f4f6',
+    color: '#1f2937',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    fontSize: 14,
+    marginTop: 8,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 12,
+    gap: 8,
+  },
+  saveButton: {
+    backgroundColor: '#e756b7ff',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  cancelButton: {
+    backgroundColor: '#fff',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7ef',
+    marginRight: 8,
+  },
+  cancelButtonText: {
+    color: '#6b7280',
+    fontWeight: '600',
+  },
+  editButton: {
+    marginRight: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editButtonText: {
     color: '#826bdfff',
     fontWeight: '700',
   },
